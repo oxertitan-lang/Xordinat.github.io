@@ -3,34 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC Kart Bilgi Okuyucu</title>
+    <title>Gelişmiş NFC Kart Okuyucu</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; margin: 0; }
-        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 400px; }
-        button { background-color: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background 0.3s; }
-        button:hover { background-color: #0056b3; }
-        #status { margin-top: 20px; font-weight: bold; color: #555; }
-        #result { margin-top: 15px; text-align: left; background: #eee; padding: 10px; border-radius: 5px; word-break: break-all; white-space: pre-wrap; display: none; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
+        h2 { color: #1a73e8; margin-bottom: 20px; }
+        #scanBtn { background-color: #1a73e8; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; width: 100%; }
+        #scanBtn:hover { background-color: #1557b0; }
+        #output { margin-top: 25px; text-align: left; display: none; border-top: 2px solid #eee; pt: 15px; }
+        .info-item { background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #1a73e8; }
+        .label { font-weight: bold; color: #555; font-size: 12px; text-transform: uppercase; display: block; }
+        .value { font-size: 16px; color: #222; word-break: break-all; }
+        #status { margin-top: 15px; font-size: 14px; font-weight: 500; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>NFC Okuyucu</h2>
-    <p>Kart bilgilerini görmek için aşağıdaki butona basın ve kartı telefonun arkasına yaklaştırın.</p>
-    <button id="scanBtn">Taramayı Başlat</button>
-    <div id="status">Hazır.</div>
-    <div id="result"></div>
+<div class="card">
+    <h2>NFC Kimlik Okuyucu</h2>
+    <p>Kartı okutmak için butona basıp telefonun arkasına dokundurun.</p>
+    
+    <button id="scanBtn">Kartı Tara</button>
+    
+    <div id="status"></div>
+
+    <div id="output">
+        <div class="info-item">
+            <span class="label">Kart Seri Numarası (UID)</span>
+            <span id="uid" class="value">-</span>
+        </div>
+        <div id="recordsContainer">
+            </div>
+    </div>
 </div>
 
 <script>
     const scanBtn = document.getElementById('scanBtn');
-    const statusDiv = document.getElementById('status');
-    const resultDiv = document.getElementById('result');
+    const status = document.getElementById('status');
+    const output = document.getElementById('output');
+    const uidDisplay = document.getElementById('uid');
+    const recordsContainer = document.getElementById('recordsContainer');
 
     scanBtn.addEventListener('click', async () => {
         if (!('NDEFReader' in window)) {
-            statusDiv.innerText = "Hata: Tarayıcınız Web NFC desteğine sahip değil. (Android Chrome deneyin)";
+            status.innerHTML = "<span style='color:red'>Hata: Tarayıcı NFC desteklemiyor veya HTTPS değil!</span>";
             return;
         }
 
@@ -38,33 +54,36 @@
             const ndef = new NDEFReader();
             await ndef.scan();
             
-            statusDiv.innerText = "NFC Taraması Aktif... Kartı yaklaştırın.";
-            statusDiv.style.color = "blue";
-
-            ndef.onreadingerror = () => {
-                statusDiv.innerText = "Hata: Kart okunamadı. Tekrar deneyin.";
-                statusDiv.style.color = "red";
-            };
+            status.innerHTML = "<span style='color:blue'>Tarama başladı... Kartı yaklaştırın.</span>";
 
             ndef.onreading = ({ message, serialNumber }) => {
-                statusDiv.innerText = "Okuma Başarılı!";
-                statusDiv.style.color = "green";
-                resultDiv.style.display = "block";
+                status.innerHTML = "<span style='color:green'>Okuma Başarılı!</span>";
+                output.style.display = "block";
                 
-                let output = `Seri Numarası: ${serialNumber}\n`;
-                
+                // UID (Seri Numarası) bilgisini yaz
+                uidDisplay.innerText = serialNumber || "Gizli veya Yok";
+
+                // İçerikteki verileri (Metinleri) oku
+                recordsContainer.innerHTML = ""; // Önce temizle
                 for (const record of message.records) {
-                    const decoder = new TextDecoder(record.encoding);
-                    output += `Kayıt Tipi: ${record.recordType}\n`;
-                    output += `Veri: ${decoder.decode(record.data)}\n`;
+                    const decoder = new TextDecoder(record.encoding || 'utf-8');
+                    const dataText = decoder.decode(record.data);
+                    
+                    recordsContainer.innerHTML += `
+                        <div class="info-item">
+                            <span class="label">Kayıt Tipi: ${record.recordType}</span>
+                            <span class="value">${dataText}</span>
+                        </div>
+                    `;
                 }
-                
-                resultDiv.innerText = output;
+            };
+
+            ndef.onreadingerror = () => {
+                status.innerHTML = "<span style='color:red'>Kart okunamadı. Tekrar deneyin.</span>";
             };
 
         } catch (error) {
-            statusDiv.innerText = "Hata: " + error;
-            statusDiv.style.color = "red";
+            status.innerHTML = "<span style='color:red'>Hata: " + error + "</span>";
         }
     });
 </script>
